@@ -1,1 +1,76 @@
-const CACHE='rome-2026-v4';const ASSETS=["./", "./index.html", "./manifest.webmanifest", "./assets/aroma.jpg", "./assets/attraction.jpg", "./assets/caravita.jpg", "./assets/circus47.jpg", "./assets/coffee.jpg", "./assets/colosseum.jpg", "./assets/gelato.jpg", "./assets/gigi.jpg", "./assets/hassler.jpg", "./assets/hero.jpg", "./assets/icon-192.png", "./assets/icon-512.png", "./assets/mapthumbs.jpg", "./assets/mizio.jpg", "./assets/navona.jpg", "./assets/pantheon.jpg", "./assets/pasta.jpg", "./assets/pastry.jpg", "./assets/pizza.jpg", "./assets/pizzarium.jpg", "./assets/180g.jpg", "./assets/adele.jpg", "./assets/alpicchio.jpg", "./assets/antica.jpg", "./assets/anticofornotrevi.jpg", "./assets/anticovinaio.jpg", "./assets/appian.jpg", "./assets/armando.jpg", "./assets/aroma.jpg", "./assets/arota.jpg", "./assets/aventina.jpg", "./assets/bolognese.jpg", "./assets/borghese.jpg", "./assets/borromini.jpg", "./assets/caravita.jpg", "./assets/castel.jpg", "./assets/catacombs.jpg", "./assets/cesare.jpg", "./assets/cielo.jpg", "./assets/circus47.jpg", "./assets/colosseum.jpg", "./assets/daenzo.jpg", "./assets/dateo.jpg", "./assets/divinity.jpg", "./assets/emma.jpg", "./assets/etoiles.jpg", "./assets/faro.jpg", "./assets/flavio.jpg", "./assets/fortunata.jpg", "./assets/forum.jpg", "./assets/frigidarium.jpg", "./assets/gelteatro.jpg", "./assets/giardino.jpg", "./assets/gigi.jpg", "./assets/grani.jpg", "./assets/grappolo.jpg", "./assets/grue.jpg", "./assets/hassler.jpg", "./assets/isuppli.jpg", "./assets/laromana.jpg", "./assets/levain.jpg", "./assets/levaincafe.jpg", "./assets/licata.jpg", "./assets/ligea.jpg", "./assets/luciano.jpg", "./assets/mizio.jpg", "./assets/navona.jpg", "./assets/nivis.jpg", "./assets/oro.jpg", "./assets/otaleg.jpg", "./assets/pacepalato.jpg", "./assets/pantheon.jpg", "./assets/pinsitaly.jpg", "./assets/piperno.jpg", "./assets/pizzarium.jpg", "./assets/pollarolo.jpg", "./assets/pommidoro.jpg", "./assets/regoli.jpg", "./assets/roscioli.jpg", "./assets/rosciolicafe.jpg", "./assets/santeustachio.jpg", "./assets/santopalato.jpg", "./assets/sensorio.jpg", "./assets/seu.jpg", "./assets/singer.jpg", "./assets/slow.jpg", "./assets/spanish.jpg", "./assets/stpeters.jpg", "./assets/supplizio.jpg", "./assets/tavernaccia.jpg", "./assets/tazza.jpg", "./assets/testaccio.jpg", "./assets/tonnarello.jpg", "./assets/torce.jpg", "./assets/trapizzino.jpg", "./assets/trastevere.jpg", "./assets/trevi.jpg", "./assets/trilussa.jpg", "./assets/vatican.jpg", "./assets/vattani.jpg", "./assets/venchi.jpg", "./assets/zuma.jpg", "./assets/regoli.jpg", "./assets/restaurant.jpg", "./assets/rooftop.jpg", "./assets/singer.jpg", "./assets/stpeters.jpg", "./assets/street.jpg", "./assets/tonnarello.jpg", "./assets/trevi.jpg", "./assets/zuma.jpg"];self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(ASSETS)).then(()=>self.skipWaiting())));self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).then(resp=>{const copy=resp.clone();caches.open(CACHE).then(c=>c.put(e.request,copy));return resp}).catch(()=>caches.match('./index.html'))))});
+const CACHE = 'rome-2026-v5';
+const CORE = [
+  './',
+  './index.html',
+  './manifest.webmanifest',
+  './assets/icon-192.png',
+  './assets/icon-512.png'
+];
+
+self.addEventListener('install', event => {
+  event.waitUntil(
+    caches.open(CACHE)
+      .then(cache => cache.addAll(CORE))
+      .then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    caches.keys()
+      .then(keys => Promise.all(
+        keys
+          .filter(key => key.startsWith('rome-2026-') && key !== CACHE)
+          .map(key => caches.delete(key))
+      ))
+      .then(() => self.clients.claim())
+  );
+});
+
+self.addEventListener('fetch', event => {
+  if (event.request.method !== 'GET') return;
+
+  const request = event.request;
+  const url = new URL(request.url);
+
+  // Always try the network first for page navigations so app updates appear quickly.
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then(response => {
+          const copy = response.clone();
+          caches.open(CACHE).then(cache => {
+            cache.put('./index.html', copy.clone());
+            cache.put(request, copy);
+          });
+          return response;
+        })
+        .catch(async () => {
+          return (await caches.match('./index.html')) || Response.error();
+        })
+    );
+    return;
+  }
+
+  // Local assets: cache-first for speed/offline use, then update the cache on first fetch.
+  if (url.origin === self.location.origin) {
+    event.respondWith(
+      caches.match(request).then(cached => {
+        if (cached) return cached;
+        return fetch(request).then(response => {
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE).then(cache => cache.put(request, copy));
+          }
+          return response;
+        });
+      })
+    );
+    return;
+  }
+
+  // External venue images/maps: prefer a fresh network response.
+  event.respondWith(
+    fetch(request).catch(() => caches.match(request))
+  );
+});
