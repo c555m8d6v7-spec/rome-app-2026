@@ -1,4 +1,4 @@
-const CACHE = 'rome-2026-v5';
+const CACHE = 'rome-2026-v6';
 const CORE = [
   './',
   './index.html',
