@@ -1,7 +1,5 @@
-const CACHE = 'rome-2026-v9';
+const CACHE = 'rome-2026-v10';
 const CORE = [
-  './',
-  './index.html',
   './manifest.webmanifest',
   './assets/icon-192.png',
   './assets/icon-512.png'
@@ -33,26 +31,28 @@ self.addEventListener('fetch', event => {
   const request = event.request;
   const url = new URL(request.url);
 
-  // Always try the network first for page navigations so app updates appear quickly.
+  // HTML navigations must always bypass Safari/HTTP caches.
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request)
+      fetch(request, { cache: 'no-store' })
         .then(response => {
-          const copy = response.clone();
-          caches.open(CACHE).then(cache => {
-            cache.put('./index.html', copy.clone());
-            cache.put(request, copy);
-          });
+          if (response && response.ok) {
+            const copy = response.clone();
+            caches.open(CACHE).then(cache => cache.put(request, copy));
+          }
           return response;
         })
         .catch(async () => {
-          return (await caches.match('./index.html')) || Response.error();
+          return (await caches.match(request))
+            || (await caches.match('./app-v9.html'))
+            || (await caches.match('./index.html'))
+            || Response.error();
         })
     );
     return;
   }
 
-  // Local assets: cache-first for speed/offline use, then update the cache on first fetch.
+  // Local static assets can stay cache-first.
   if (url.origin === self.location.origin) {
     event.respondWith(
       caches.match(request).then(cached => {
@@ -69,8 +69,6 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // External venue images/maps: prefer a fresh network response.
-  event.respondWith(
-    fetch(request).catch(() => caches.match(request))
-  );
+  // External venue images/maps: prefer fresh network responses.
+  event.respondWith(fetch(request).catch(() => caches.match(request)));
 });
